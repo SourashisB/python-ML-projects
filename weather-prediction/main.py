@@ -9,15 +9,13 @@ from keras.api.layers import *
 from keras.api.optimizers import *
 
 
-# Fetch data from OpenMeteo API with more parameters
 def get_weather_data():
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=90)  # Extended historical data
+    start_date = end_date - timedelta(days=45)  # Extra buffer for training data
     
     url = (f"https://api.open-meteo.com/v1/forecast?"
            f"latitude=22.2783&longitude=114.1747&"
-           f"hourly=temperature_2m,relative_humidity_2m,dew_point_2m,"
-           f"apparent_temperature,precipitation,surface_pressure&"
+           f"hourly=temperature_2m&"
            f"start_date={start_date.strftime('%Y-%m-%d')}&"
            f"end_date={end_date.strftime('%Y-%m-%d')}")
     
@@ -26,24 +24,15 @@ def get_weather_data():
     
     df = pd.DataFrame({
         'datetime': pd.to_datetime(data['hourly']['time']),
-        'temperature': data['hourly']['temperature_2m'],
-        'humidity': data['hourly']['relative_humidity_2m'],
-        'dew_point': data['hourly']['dew_point_2m'],
-        'apparent_temp': data['hourly']['apparent_temperature'],
-        'precipitation': data['hourly']['precipitation'],
-        'pressure': data['hourly']['surface_pressure']
+        'temperature': data['hourly']['temperature_2m']
     })
     
-    # Add time-based features
     df.set_index('datetime', inplace=True)
     df['hour'] = df.index.hour
     df['day_of_week'] = df.index.dayofweek
-    df['month'] = df.index.month
-    df['day_of_year'] = df.index.dayofyear
     
     return df
 
-# Attention layer
 class AttentionLayer(Layer):
     def __init__(self, **kwargs):
         super(AttentionLayer, self).__init__(**kwargs)
@@ -65,33 +54,34 @@ class AttentionLayer(Layer):
         output = x * a
         return tf.keras.backend.sum(output, axis=1)
 
-# Prepare data for model
-def prepare_data(data, n_past=168, n_future=336):  # 7 days past, 14 days future
+def prepare_data(data, n_past=336, n_future=168):  # 14 days past, 7 days future
     X, y = [], []
     for i in range(len(data) - n_past - n_future):
-        X.append(data[i:(i + n_past)])
-        y.append(data[i + n_past:i + n_past + n_future, 0])  # Only temperature for output
+        past_data = data[i:(i + n_past)]
+        future_temp = data[i + n_past:i + n_past + n_future, 0]  # Only temperature for output
+        X.append(past_data)
+        y.append(future_temp)
     return np.array(X), np.array(y)
 
-# Create improved model
 def create_model(input_shape, output_length):
     inputs = Input(shape=input_shape)
     
-    # First Bidirectional LSTM layer with larger units
-    x = Bidirectional(LSTM(128, return_sequences=True))(inputs)
+    # First Bidirectional LSTM layer
+    x = Bidirectional(LSTM(64, return_sequences=True))(inputs)
     x = Dropout(0.2)(x)
     
     # Second Bidirectional LSTM layer
-    x = Bidirectional(LSTM(64, return_sequences=True))(x)
+    x = Bidirectional(LSTM(32, return_sequences=True))(x)
     x = Dropout(0.2)(x)
     
     # Attention mechanism
     x = AttentionLayer()(x)
     
-    # Dense layers
-    x = Dense(128, activation='relu')(x)
-    x = Dropout(0.2)(x)
-    x = Dense(64, activation='relu')(x)
+    # Dense layers with residual connections
+    dense1 = Dense(64, activation='relu')(x)
+    x = Dropout(0.2)(dense1)
+    dense2 = Dense(32, activation='relu')(x)
+    x = Add()([dense1, Dense(64)(dense2)])  # Residual connection
     
     # Output layer
     outputs = Dense(output_length, activation='linear')(x)
@@ -106,7 +96,6 @@ def main():
     # Scale data
     scaler = MinMaxScaler()
     scaled_data = scaler.fit_transform(df)
-    scaled_df = pd.DataFrame(scaled_data, columns=df.columns, index=df.index)
     
     # Prepare training data
     X, y = prepare_data(scaled_data)
@@ -119,36 +108,36 @@ def main():
     # Create and train model
     model = create_model((X.shape[1], X.shape[2]), y.shape[1])
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
-                 loss='huber')  # Huber loss is more robust to outliers
+                 loss='huber')
     
-    # Early stopping and learning rate reduction callbacks
-    early_stopping = tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss',
-        patience=10,
-        restore_best_weights=True
-    )
-    
-    lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(
-        monitor='val_loss',
-        factor=0.5,
-        patience=5
-    )
+    callbacks = [
+        tf.keras.callbacks.EarlyStopping(
+            monitor='val_loss',
+            patience=10,
+            restore_best_weights=True
+        ),
+        tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=5
+        )
+    ]
     
     # Train model
     history = model.fit(X_train, y_train,
                        epochs=100,
                        batch_size=32,
                        validation_split=0.2,
-                       callbacks=[early_stopping, lr_reducer],
+                       callbacks=callbacks,
                        verbose=1)
     
     # Make forecast
-    last_sequence = scaled_data[-168:]  # Last 7 days
-    forecast_scaled = model.predict(last_sequence.reshape(1, 168, scaled_data.shape[1]))
+    last_sequence = scaled_data[-336:]  # Last 14 days
+    forecast_scaled = model.predict(last_sequence.reshape(1, 336, scaled_data.shape[1]))
     
-    # Inverse transform the forecast (only temperature)
+    # Inverse transform the forecast
     forecast_reshaped = np.zeros((len(forecast_scaled[0]), scaled_data.shape[1]))
-    forecast_reshaped[:, 0] = forecast_scaled[0]  # Temperature column
+    forecast_reshaped[:, 0] = forecast_scaled[0]
     forecast = scaler.inverse_transform(forecast_reshaped)[:, 0]
     
     # Create forecast dates
@@ -159,20 +148,42 @@ def main():
     
     # Plot results
     plt.figure(figsize=(15, 6))
-    plt.plot(df.index[-7*24:], df['temperature'][-7*24:], label='Historical')
-    plt.plot(forecast_dates, forecast, label='Forecast')
-    plt.title('Hong Kong Temperature Forecast (Improved Model)')
+    
+    # Plot last 14 days of historical data
+    historical_dates = df.index[-336:]
+    historical_temps = df['temperature'][-336:]
+    plt.plot(historical_dates, historical_temps, label='Historical', color='blue')
+    
+    # Plot 7-day forecast
+    plt.plot(forecast_dates, forecast, label='Forecast', color='red')
+    
+    plt.title('Hong Kong Temperature Forecast (14 Days History → 7 Days Forecast)')
     plt.xlabel('Date')
     plt.ylabel('Temperature (°C)')
     plt.legend()
     plt.grid(True)
+    
+    # Add vertical line to separate historical data from forecast
+    plt.axvline(x=last_date, color='black', linestyle='--', alpha=0.5)
+    
+    # Rotate x-axis labels for better readability
+    plt.xticks(rotation=45)
+    
+    plt.tight_layout()
     plt.show()
     
     # Print forecast summary (daily averages)
     forecast_df = pd.DataFrame({'temperature': forecast}, index=forecast_dates)
-    daily_forecast = forecast_df.resample('D').agg({'temperature': ['mean', 'min', 'max']})
+    daily_forecast = forecast_df.resample('D').agg({
+        'temperature': ['mean', 'min', 'max']
+    }).round(1)
+    
     print("\nDaily Temperature Forecast (°C):")
     print(daily_forecast)
+    
+    # Print model evaluation metrics
+    test_loss = model.evaluate(X_test, y_test, verbose=0)
+    print(f"\nTest Loss: {test_loss:.4f}")
 
 if __name__ == "__main__":
     main()
