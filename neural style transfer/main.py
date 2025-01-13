@@ -49,31 +49,32 @@ def compute_content_loss(base_content, target):
     return tf.reduce_mean(tf.square(base_content - target))
 
 def gram_matrix(tensor):
-    """Computes the Gram matrix, used for style representation."""
-    channels = int(tensor.shape[-1])
-    vectorized = tf.reshape(tensor, [-1, channels])
-    gram = tf.matmul(tf.transpose(vectorized), vectorized)
-    return gram
+    """Computes the Gram matrix for a given tensor."""
+    # Extract the dimensions of the tensor
+    result = tf.linalg.einsum('bijc,bijd->bcd', tensor, tensor)
+    input_shape = tf.shape(tensor)
+    num_elements = tf.cast(input_shape[1] * input_shape[2], tf.float32)  # height * width
+    return result / num_elements
 
 def compute_style_loss(base_style, gram_target):
-    """Computes the style loss using the Gram matrix."""
-    gram_style = gram_matrix(base_style)
-    return tf.reduce_mean(tf.square(gram_style - gram_target))
+    """
+    Computes the style loss between the style image and the generated image.
+    
+    Args:
+        base_style (Tensor): Feature map of the generated image.
+        gram_target (Tensor): Precomputed Gram matrix of the style image.
+    
+    Returns:
+        Tensor: Style loss value.
+    """
+    gram_style = gram_matrix(base_style)  # Compute Gram matrix for the generated image
+    return tf.reduce_mean(tf.square(gram_style - gram_target))  # Mean square error
 
 # Neural Style Transfer class
 class NeuralStyleTransfer:
     def __init__(self, content_path, style_path, content_layers, style_layers, target_size=(512, 512)):
-        """
-        Initialize the NeuralStyleTransfer model.
-        
-        Args:
-            content_path (str): Path to the content image.
-            style_path (str): Path to the style image.
-            content_layers (list): List of content layer names.
-            style_layers (list): List of style layer names.
-            target_size (tuple): Target size to resize both images (height, width).
-        """
-        # Load and preprocess the content and style images
+        """Initialize the NeuralStyleTransfer model."""
+        # Load and preprocess images
         self.content_image = load_and_process_image(content_path, target_size=target_size)
         self.style_image = load_and_process_image(style_path, target_size=target_size)
 
@@ -86,23 +87,19 @@ class NeuralStyleTransfer:
         # Build the model to extract features
         self.model = build_vgg_model(style_layers + content_layers)
 
-        # Extract target features from the content and style images
-        self.style_targets = self.extract_features(self.style_image)['style']
-        self.content_targets = self.extract_features(self.content_image)['content']
+        # Extract features for style and content images
+        style_features = self.extract_features(self.style_image)
+        content_features = self.extract_features(self.content_image)
+
+        # Precompute Gram matrices for style features
+        self.style_targets = {layer: gram_matrix(style_features['style'][layer]) for layer in style_layers}
+        self.content_targets = content_features['content']
 
         # Initialize the generated image as a trainable variable
         self.generated_image = tf.Variable(tf.convert_to_tensor(self.content_image), dtype=tf.float32)
 
     def extract_features(self, image):
-        """
-        Extract style and content features from an image using the VGG19 model.
-        
-        Args:
-            image (Tensor): Preprocessed image tensor.
-        
-        Returns:
-            dict: Dictionary with 'style' and 'content' feature maps.
-        """
+        """Extract style and content features from an image using the VGG19 model."""
         outputs = self.model(image)
         style_features = outputs[:len(self.style_layers)]
         content_features = outputs[len(self.style_layers):]
@@ -111,12 +108,7 @@ class NeuralStyleTransfer:
         return {'style': style_dict, 'content': content_dict}
 
     def compute_loss(self):
-        """
-        Compute the total loss for the style transfer process.
-        
-        Returns:
-            Tensor: Total loss value.
-        """
+        """Computes the total loss for the NST process."""
         outputs = self.model(self.generated_image)
         style_outputs = outputs[:len(self.style_layers)]
         content_outputs = outputs[len(self.style_layers):]
@@ -175,8 +167,8 @@ class NeuralStyleTransfer:
 if __name__ == "__main__":
     print("Current working directory:", os.getcwd())
     # File paths for content and style images
-    content_path = "neural style transfer/image1.png"
-    style_path = "neural style transfer/image-2.jpg"
+    content_path = "image1.png"
+    style_path = "image-2.jpg"
 
     # Define the layers for style and content extraction
     content_layers = ['block5_conv2']  # Content layer
