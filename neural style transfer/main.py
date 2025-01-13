@@ -4,24 +4,20 @@ import matplotlib.pyplot as plt
 from keras import Model
 from keras.api.applications import vgg19
 from keras.api.preprocessing.image import load_img, img_to_array
-
+from keras.api.mixed_precision import set_global_policy
 import os
+
+set_global_policy('mixed_float16')
 
 
 # Load and preprocess images
 def load_and_process_image(image_path, target_size=(512, 512)):
     """Loads an image, resizes it to a fixed size, and preprocesses it for VGG19."""
-    img = load_img(image_path, target_size=target_size)  # Resize image to a fixed shape
-    img = img_to_array(img)  # Convert to NumPy array
-
-    # Convert to TensorFlow tensor
-    img = tf.convert_to_tensor(img, dtype=tf.float32)
-
-    # Add batch dimension
+    img = load_img(image_path, target_size=target_size)  # Resize image to fixed shape
+    img = img_to_array(img)  # Convert image to NumPy array
+    img = tf.convert_to_tensor(img, dtype=tf.float32)  # Convert to TensorFlow tensor
     img = tf.expand_dims(img, axis=0)  # Add batch dimension
-
-    # Preprocess for VGG19
-    img = vgg19.preprocess_input(img)  # Preprocess (BGR format and mean subtraction)
+    img = vgg19.preprocess_input(img)  # Preprocess for VGG19
     return img
 
 def deprocess_image(processed_img):
@@ -50,7 +46,9 @@ def compute_content_loss(base_content, target):
 
 def gram_matrix(tensor):
     """Computes the Gram matrix for a given tensor."""
-    # Extract the dimensions of the tensor
+    # Ensure the tensor is in float32
+    tensor = tf.cast(tensor, tf.float32)
+    # Compute the Gram matrix
     result = tf.linalg.einsum('bijc,bijd->bcd', tensor, tensor)
     input_shape = tf.shape(tensor)
     num_elements = tf.cast(input_shape[1] * input_shape[2], tf.float32)  # height * width
@@ -92,7 +90,10 @@ class NeuralStyleTransfer:
         content_features = self.extract_features(self.content_image)
 
         # Precompute Gram matrices for style features
-        self.style_targets = {layer: gram_matrix(style_features['style'][layer]) for layer in style_layers}
+        self.style_targets = {
+            layer: tf.cast(gram_matrix(style_features['style'][layer]), tf.float32)
+            for layer in style_layers
+        }
         self.content_targets = content_features['content']
 
         # Initialize the generated image as a trainable variable
@@ -108,7 +109,6 @@ class NeuralStyleTransfer:
         return {'style': style_dict, 'content': content_dict}
 
     def compute_loss(self):
-        """Computes the total loss for the NST process."""
         outputs = self.model(self.generated_image)
         style_outputs = outputs[:len(self.style_layers)]
         content_outputs = outputs[len(self.style_layers):]
@@ -116,18 +116,25 @@ class NeuralStyleTransfer:
         # Compute style loss
         style_loss = 0
         for style_output, target_style in zip(style_outputs, self.style_targets.values()):
+            style_output = tf.cast(style_output, tf.float32)
+            target_style = tf.cast(target_style, tf.float32)
             style_loss += compute_style_loss(style_output, target_style)
         style_loss /= self.num_style_layers
 
         # Compute content loss
         content_loss = 0
         for content_output, target_content in zip(content_outputs, self.content_targets.values()):
+            content_output = tf.cast(content_output, tf.float32)
+            target_content = tf.cast(target_content, tf.float32)
             content_loss += compute_content_loss(content_output, target_content)
         content_loss /= self.num_content_layers
 
-        # Combine the losses
-        total_loss = 1e-4 * style_loss + 1e4 * content_loss
+        # Adjust the weights of style and content losses
+        style_weight = 1e-1  # Increase the style weight
+        content_weight = 1e3  # Decrease the content weight
+        total_loss = style_weight * style_loss + content_weight * content_loss
         return total_loss
+    
 
     def train(self, epochs=10, steps_per_epoch=100, learning_rate=0.02):
         """
@@ -144,14 +151,14 @@ class NeuralStyleTransfer:
         def train_step():
             with tf.GradientTape() as tape:
                 loss = self.compute_loss()
+            # Cast loss to float32 (if necessary)
+            loss = tf.cast(loss, tf.float32)
             grads = tape.gradient(loss, self.generated_image)
+            # Apply gradients
             optimizer.apply_gradients([(grads, self.generated_image)])
+            # Ensure the generated image remains in the valid range
             self.generated_image.assign(tf.clip_by_value(self.generated_image, -1.0, 1.0))
-
-        for epoch in range(epochs):
-            for step in range(steps_per_epoch):
-                train_step()
-            print(f"Epoch {epoch + 1}/{epochs} completed")
+            return loss
 
     def get_result(self):
         """
@@ -166,16 +173,14 @@ class NeuralStyleTransfer:
 # Main
 if __name__ == "__main__":
     print("Current working directory:", os.getcwd())
+    print("Num GPUs Available:", len(tf.config.list_physical_devices('GPU')))
     # File paths for content and style images
-    content_path = "image1.png"
-    style_path = "image-2.jpg"
+    content_path = "./neural style transfer/image1.png"
+    style_path = "./neural style transfer/image-2.jpg"
 
     # Define the layers for style and content extraction
-    content_layers = ['block5_conv2']  # Content layer
-    style_layers = [
-        'block1_conv1', 'block2_conv1', 'block3_conv1',
-        'block4_conv1', 'block5_conv1'
-    ]  # Style layers
+    content_layers = ['block4_conv2']  # Higher-level content layer
+    style_layers = ['block1_conv1', 'block2_conv1', 'block3_conv1', 'block4_conv1', 'block5_conv1'] # Fewer style layers
 
     # Instantiate and train the NST model
         # Instantiate and train the NST model
@@ -184,9 +189,9 @@ if __name__ == "__main__":
         style_path,
         content_layers,
         style_layers,
-        target_size=(512, 512)
-    )
-    nst.train(epochs=10, steps_per_epoch=100, learning_rate=0.02)
+        target_size=(256, 256)  # Smaller image size
+)
+    nst.train(epochs=20, steps_per_epoch=200, learning_rate=0.01)    
 
     # Display the result
     result = nst.get_result()
