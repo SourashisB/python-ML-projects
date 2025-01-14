@@ -134,7 +134,7 @@ class NeuralStyleTransfer:
         content_weight = 1e3  # Decrease the content weight
         total_loss = style_weight * style_loss + content_weight * content_loss
         return total_loss
-    
+
 
     def train(self, epochs=10, steps_per_epoch=100, learning_rate=0.02):
         """
@@ -189,7 +189,7 @@ if __name__ == "__main__":
         style_path,
         content_layers,
         style_layers,
-        target_size=(256, 256)  # Smaller image size
+        target_size=(512, 512)  # Smaller image size
 )
     nst.train(epochs=20, steps_per_epoch=200, learning_rate=0.01)    
 
