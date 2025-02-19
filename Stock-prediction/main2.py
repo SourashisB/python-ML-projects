@@ -2,89 +2,64 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.preprocessing import MinMaxScaler
-from keras import Sequential
-from keras.api.optimizers import Adam
-from keras.api.callbacks import ReduceLROnPlateau
-from keras.api.layers import Dense, LSTM, Dropout, Bidirectional
+import xgboost as xgb
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import math
 
 # Load the dataset
 file_path = "Ali_Baba_Stock_Data.csv"  # Change this to your actual file path
 df = pd.read_csv(file_path, parse_dates=['Date'], index_col='Date')
+# Feature Engineering: Adding Moving Averages & Indicators
+df['SMA_10'] = df['Adj Close'].rolling(window=10).mean()
+df['SMA_50'] = df['Adj Close'].rolling(window=50).mean()
+df['EMA_10'] = df['Adj Close'].ewm(span=10).mean()
+df['Price Change'] = df['Adj Close'].pct_change()  # Percentage Change
+df.dropna(inplace=True)  # Drop NaN values
 
-# Use relevant features (Multivariate)
-features = ['Adj Close', 'Open', 'High', 'Low', 'Volume']
-df = df[features]
+# Create Lag Features (Past Prices as Input for Prediction)
+for lag in range(1, 11):  # Using past 10 days as features
+    df[f'Lag_{lag}'] = df['Adj Close'].shift(lag)
 
-# Normalize the dataset
-scaler = MinMaxScaler(feature_range=(0,1))
-df_scaled = scaler.fit_transform(df)
+df.dropna(inplace=True)  # Drop NaN from lag features
 
-# Splitting dataset (90% train, 10% test)
-train_size = int(len(df_scaled) * 0.90)
-train_data, test_data = df_scaled[:train_size], df_scaled[train_size:]
+# Selecting Features
+features = ['Open', 'High', 'Low', 'Volume', 'SMA_10', 'SMA_50', 'EMA_10', 'Price Change'] + [f'Lag_{i}' for i in range(1, 11)]
+target = 'Adj Close'
 
-# Function to create sequences
-def create_sequences(data, seq_length=100):
-    X, y = [], []
-    for i in range(len(data) - seq_length):
-        X.append(data[i:i+seq_length])
-        y.append(data[i+seq_length, 0])  # Predicting 'Adj Close' only
-    return np.array(X), np.array(y)
+# Splitting into Train-Test (90% Train, 10% Test)
+train_size = int(len(df) * 0.90)
+train_df, test_df = df.iloc[:train_size], df.iloc[train_size:]
 
-sequence_length = 100
-X_train, y_train = create_sequences(train_data, sequence_length)
-X_test, y_test = create_sequences(test_data, sequence_length)
+X_train, y_train = train_df[features], train_df[target]
+X_test, y_test = test_df[features], test_df[target]
 
-# Reshape for LSTM input
-X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], X_train.shape[2]))
-X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], X_test.shape[2]))
+# Create XGBoost Model
+xgb_model = xgb.XGBRegressor(
+    objective='reg:squarederror', 
+    n_estimators=500, 
+    learning_rate=0.01, 
+    max_depth=6, 
+    subsample=0.8, 
+    colsample_bytree=0.8, 
+    random_state=42
+)
 
-# Build an optimized LSTM model
-model = Sequential([
-    Bidirectional(LSTM(units=100, return_sequences=True, input_shape=(sequence_length, len(features)))),
-    Dropout(0.2),
-    
-    Bidirectional(LSTM(units=100, return_sequences=True)),
-    Dropout(0.2),
-    
-    Bidirectional(LSTM(units=50, return_sequences=False)),
-    Dropout(0.2),
-    
-    Dense(units=25),
-    Dense(units=1)  # Predicting 'Adj Close'
-])
-
-# Compile model with Adam optimizer and learning rate scheduling
-optimizer = Adam(learning_rate=0.001)
-model.compile(optimizer=optimizer, loss='mean_squared_error')
-
-# Learning rate scheduler
-lr_scheduler = ReduceLROnPlateau(monitor='val_loss', patience=5, factor=0.5, verbose=1)
-
-# Train the model
-model.fit(X_train, y_train, batch_size=32, epochs=50, validation_data=(X_test, y_test), callbacks=[lr_scheduler])
+# Train the Model
+xgb_model.fit(X_train, y_train)
 
 # Predictions
-predictions = model.predict(X_test)
-predictions = scaler.inverse_transform(np.hstack((predictions, np.zeros((predictions.shape[0], len(features)-1)))))[:,0]
-
-# Convert actual values back to original scale
-y_test_actual = scaler.inverse_transform(np.hstack((y_test.reshape(-1,1), np.zeros((y_test.shape[0], len(features)-1)))))[:,0]
+predictions = xgb_model.predict(X_test)
 
 # Calculate RMSE & MAE
-rmse = math.sqrt(mean_squared_error(y_test_actual, predictions))
-mae = mean_absolute_error(y_test_actual, predictions)
-print(f'Optimized RMSE: {rmse}, Optimized MAE: {mae}')
+rmse = math.sqrt(mean_squared_error(y_test, predictions))
+mae = mean_absolute_error(y_test, predictions)
+print(f'XGBoost RMSE: {rmse}, XGBoost MAE: {mae}')
 
-# Plot actual vs predicted stock prices
+# Plot Actual vs Predicted Prices
 plt.figure(figsize=(12,6))
-plt.plot(df.index[train_size+sequence_length:], y_test_actual, label="Actual Price", color='blue')
-plt.plot(df.index[train_size+sequence_length:], predictions, label="Predicted Price", color='red')
-plt.title('Alibaba Stock Price Prediction (Optimized)')
+plt.plot(test_df.index, y_test, label="Actual Price", color='blue')
+plt.plot(test_df.index, predictions, label="Predicted Price", color='red')
+plt.title('Alibaba Stock Price Prediction (XGBoost)')
 plt.xlabel('Date')
 plt.ylabel('Stock Price')
 plt.legend()
