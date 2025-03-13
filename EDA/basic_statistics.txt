@@ -1,0 +1,127 @@
+Dataset Overview:
+Number of records: 1000
+Number of features: 28
+
+Missing values by column:
+                        Missing Values  Percentage
+Social_Media_Influence             247        24.7
+Engagement_with_Ads                256        25.6
+
+Numeric Columns Statistics:
+               Age  Purchase_Amount  Frequency_of_Purchase  Brand_Loyalty  Product_Rating  Time_Spent_on_Product_Research(hours)  Return_Rate  Customer_Satisfaction  Time_to_Decision
+count  1000.000000      1000.000000            1000.000000    1000.000000     1000.000000                            1000.000000  1000.000000            1000.000000       1000.000000
+mean     34.304000       275.063880               6.945000       3.026000        3.033000                               1.013030     0.954000               5.399000          7.547000
+std       9.353238       131.532998               3.147361       1.416803        1.436654                               0.791802     0.810272               2.868454          4.035849
+min      18.000000        50.710000               2.000000       1.000000        1.000000                               0.000000     0.000000               1.000000          1.000000
+25%      26.000000       162.235000               4.000000       2.000000        2.000000                               0.000000     0.000000               3.000000          4.000000
+50%      34.500000       276.165000               7.000000       3.000000        3.000000                               1.000000     1.000000               5.000000          8.000000
+75%      42.000000       388.982500              10.000000       4.000000        4.000000                               2.000000     2.000000               8.000000         11.000000
+max      50.000000       498.330000              12.000000       5.000000        5.000000                               2.000000     2.000000              10.000000         14.000000
+
+Categorical Columns Statistics:
+
+Customer_ID - Top 5 values:
+Customer_ID
+48-203-9118    1
+37-611-6911    1
+29-392-9296    1
+84-649-5117    1
+48-980-6078    1
+
+Gender - Top 5 values:
+Gender
+Female         452
+Male           449
+Bigender        20
+Agender         19
+Genderfluid     17
+
+Income_Level - Top 5 values:
+Income_Level
+High      515
+Middle    485
+
+Marital_Status - Top 5 values:
+Marital_Status
+Widowed     260
+Married     253
+Divorced    245
+Single      242
+
+Education_Level - Top 5 values:
+Education_Level
+Bachelor's     341
+High School    331
+Master's       328
+
+Occupation - Top 5 values:
+Occupation
+High      517
+Middle    483
+
+Location - Top 5 values:
+Location
+Oslo             4
+Créteil          3
+Göteborg         3
+La Unión         2
+São Cristóvão    2
+
+Purchase_Category - Top 5 values:
+Purchase_Category
+Electronics              54
+Sports & Outdoors        51
+Jewelry & Accessories    50
+Home Appliances          50
+Toys & Games             47
+
+Purchase_Channel - Top 5 values:
+Purchase_Channel
+Mixed       340
+Online      334
+In-Store    326
+
+Social_Media_Influence - Top 5 values:
+Social_Media_Influence
+High      268
+Low       249
+Medium    236
+
+Discount_Sensitivity - Top 5 values:
+Discount_Sensitivity
+Very Sensitive        350
+Not Sensitive         331
+Somewhat Sensitive    319
+
+Engagement_with_Ads - Top 5 values:
+Engagement_with_Ads
+High      270
+Medium    244
+Low       230
+
+Device_Used_for_Shopping - Top 5 values:
+Device_Used_for_Shopping
+Desktop       350
+Tablet        339
+Smartphone    311
+
+Payment_Method - Top 5 values:
+Payment_Method
+PayPal         219
+Other          204
+Debit Card     196
+Credit Card    194
+Cash           187
+
+Purchase_Intent - Top 5 values:
+Purchase_Intent
+Need-based     256
+Wants-based    249
+Impulsive      248
+Planned        247
+
+Shipping_Preference - Top 5 values:
+Shipping_Preference
+No Preference    372
+Standard         334
+Express          294

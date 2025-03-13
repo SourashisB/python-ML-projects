@@ -1,0 +1,73 @@
+Purchase_Channel,Purchase_Category,Average_Purchase,Number_of_Purchases
+In-Store,Animal Feed,243.38866666666667,15
+In-Store,Arts & Crafts,223.4609090909091,11
+In-Store,Baby Products,279.1,14
+In-Store,Beauty & Personal Care,176.42999999999998,12
+In-Store,Books,310.36,14
+In-Store,Clothing,296.47125,8
+In-Store,Electronics,253.627,10
+In-Store,Food & Beverages,297.322,15
+In-Store,Furniture,205.52375,16
+In-Store,Gardening & Outdoors,274.14153846153846,13
+In-Store,Groceries,337.64363636363635,11
+In-Store,Health Care,335.902,10
+In-Store,Health Supplements,289.05111111111114,18
+In-Store,Home Appliances,279.74,11
+In-Store,Hotels,255.814,10
+In-Store,Jewelry & Accessories,311.879,20
+In-Store,Luxury Goods,231.20666666666668,12
+In-Store,Mobile Accessories,238.03071428571428,14
+In-Store,Office Supplies,271.40470588235297,17
+In-Store,Packages),268.4823529411765,17
+In-Store,Software & Apps,289.87857142857143,14
+In-Store,Sports & Outdoors,236.87,12
+In-Store,Toys & Games,307.78125,16
+In-Store,Travel & Leisure (Flights,271.099375,16
+Mixed,Animal Feed,296.6653846153846,13
+Mixed,Arts & Crafts,201.43833333333336,6
+Mixed,Baby Products,291.1276923076923,13
+Mixed,Beauty & Personal Care,274.9875,12
+Mixed,Books,317.06583333333333,12
+Mixed,Clothing,285.545,14
+Mixed,Electronics,267.75791666666663,24
+Mixed,Food & Beverages,292.95307692307694,13
+Mixed,Furniture,268.9841666666667,12
+Mixed,Gardening & Outdoors,272.52176470588233,17
+Mixed,Groceries,263.1592857142857,14
+Mixed,Health Care,256.5835714285714,14
+Mixed,Health Supplements,259.418,15
+Mixed,Home Appliances,286.10833333333335,18
+Mixed,Hotels,228.76833333333332,12
+Mixed,Jewelry & Accessories,272.928125,16
+Mixed,Luxury Goods,290.9583333333333,12
+Mixed,Mobile Accessories,261.44384615384615,13
+Mixed,Office Supplies,284.674375,16
+Mixed,Packages),325.0625,16
+Mixed,Software & Apps,340.0515,20
+Mixed,Sports & Outdoors,291.844375,16
+Mixed,Toys & Games,269.68,10
+Mixed,Travel & Leisure (Flights,239.48333333333335,12
+Online,Animal Feed,247.47625,16
+Online,Arts & Crafts,227.24823529411765,17
+Online,Baby Products,248.6042857142857,14
+Online,Beauty & Personal Care,252.8,10
+Online,Books,270.26,11
+Online,Clothing,253.95499999999998,8
+Online,Electronics,243.9975,20
+Online,Food & Beverages,293.67125,16
+Online,Furniture,289.7,13
+Online,Gardening & Outdoors,256.1121428571429,14
+Online,Groceries,254.33375,16
+Online,Health Care,305.75529411764705,17
+Online,Health Supplements,226.76500000000001,8
+Online,Home Appliances,236.41571428571427,21
+Online,Hotels,253.68714285714285,14
+Online,Jewelry & Accessories,323.92357142857145,14
+Online,Luxury Goods,306.2323076923077,13
+Online,Mobile Accessories,354.14142857142855,14
+Online,Office Supplies,333.268,5
+Online,Packages),296.596,10
+Online,Software & Apps,304.67555555555555,9
+Online,Sports & Outdoors,308.63304347826084,23
+Online,Toys & Games,281.6742857142857,21
+Online,Travel & Leisure (Flights,237.839,10
