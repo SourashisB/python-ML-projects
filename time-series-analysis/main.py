@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+from keras.api.models import Sequential
+from keras.api.layers import LSTM, Dense, Dropout
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -171,103 +171,105 @@ def create_plotly_visualizations(df, actual, tf_pred, torch_pred, test_size, seq
     test_dates_str = [date.strftime('%Y-%m-%d') for date in test_dates]
     
     # Individual feature predictions vs actual
-    feature_figs = []
+    feature_plots_data = []
     
     for i, feature in enumerate(feature_names):
-        fig = go.Figure()
-        
-        # Add actual values
-        fig.add_trace(go.Scatter(
-            x=test_dates_str, 
-            y=actual[:, i],
-            mode='lines',
-            name=f'Actual {feature}',
-            line=dict(color='blue', width=2)
-        ))
-        
-        # Add TensorFlow predictions
-        fig.add_trace(go.Scatter(
-            x=test_dates_str, 
-            y=tf_pred[:, i],
-            mode='lines',
-            name='TensorFlow Prediction',
-            line=dict(color='red', width=2, dash='dash')
-        ))
-        
-        # Add PyTorch predictions
-        fig.add_trace(go.Scatter(
-            x=test_dates_str, 
-            y=torch_pred[:, i],
-            mode='lines',
-            name='PyTorch Prediction',
-            line=dict(color='green', width=2, dash='dot')
-        ))
-        
-        # Update layout
-        fig.update_layout(
-            title=f'{feature} - Actual vs Predicted Values',
-            xaxis_title='Date',
-            yaxis_title='Value',
-            legend_title='Legend',
-            hovermode='x unified',
-            template='plotly_white'
-        )
-        
-        feature_figs.append(fig)
+        feature_data = {
+            "title": f"{feature} - Actual vs Predicted Values",
+            "data": [
+                {
+                    "x": test_dates_str,
+                    "y": actual[:, i].tolist(),
+                    "type": "scatter",
+                    "mode": "lines",
+                    "name": f"Actual {feature}",
+                    "line": {"color": "blue", "width": 2}
+                },
+                {
+                    "x": test_dates_str,
+                    "y": tf_pred[:, i].tolist(),
+                    "type": "scatter",
+                    "mode": "lines",
+                    "name": "TensorFlow Prediction",
+                    "line": {"color": "red", "width": 2, "dash": "dash"}
+                },
+                {
+                    "x": test_dates_str,
+                    "y": torch_pred[:, i].tolist(),
+                    "type": "scatter",
+                    "mode": "lines",
+                    "name": "PyTorch Prediction",
+                    "line": {"color": "green", "width": 2, "dash": "dot"}
+                }
+            ],
+            "layout": {
+                "title": f"{feature} - Actual vs Predicted Values",
+                "xaxis": {"title": "Date"},
+                "yaxis": {"title": "Value"},
+                "legend": {"title": "Legend"},
+                "hovermode": "x unified",
+                "template": "plotly_white"
+            }
+        }
+        feature_plots_data.append(feature_data)
     
     # Error metrics comparison
     tf_rmse_by_feature = [math.sqrt(mean_squared_error(actual[:, i], tf_pred[:, i])) for i in range(len(feature_names))]
     torch_rmse_by_feature = [math.sqrt(mean_squared_error(actual[:, i], torch_pred[:, i])) for i in range(len(feature_names))]
     
-    metrics_fig = go.Figure()
-    
-    metrics_fig.add_trace(go.Bar(
-        x=feature_names,
-        y=tf_rmse_by_feature,
-        name='TensorFlow RMSE',
-        marker_color='red'
-    ))
-    
-    metrics_fig.add_trace(go.Bar(
-        x=feature_names,
-        y=torch_rmse_by_feature,
-        name='PyTorch RMSE',
-        marker_color='green'
-    ))
-    
-    metrics_fig.update_layout(
-        title='Model Performance Comparison (RMSE)',
-        xaxis_title='Features',
-        yaxis_title='RMSE',
-        barmode='group',
-        template='plotly_white'
-    )
+    metrics_plot_data = {
+        "data": [
+            {
+                "x": feature_names.tolist(),
+                "y": tf_rmse_by_feature,
+                "type": "bar",
+                "name": "TensorFlow RMSE",
+                "marker": {"color": "red"}
+            },
+            {
+                "x": feature_names.tolist(),
+                "y": torch_rmse_by_feature,
+                "type": "bar",
+                "name": "PyTorch RMSE",
+                "marker": {"color": "green"}
+            }
+        ],
+        "layout": {
+            "title": "Model Performance Comparison (RMSE)",
+            "xaxis": {"title": "Features"},
+            "yaxis": {"title": "RMSE"},
+            "barmode": "group",
+            "template": "plotly_white"
+        }
+    }
     
     # Create a heatmap for the correlation between actual and predicted values
     correlation_data = []
-    labels = []
     
     for i, feature in enumerate(feature_names):
         correlation_data.append([
             np.corrcoef(actual[:, i], tf_pred[:, i])[0, 1],
             np.corrcoef(actual[:, i], torch_pred[:, i])[0, 1]
         ])
-        labels.append(feature)
     
-    correlation_fig = go.Figure(data=go.Heatmap(
-        z=correlation_data,
-        x=['TensorFlow', 'PyTorch'],
-        y=labels,
-        colorscale='Viridis',
-        text=[[f'{val:.3f}' for val in row] for row in correlation_data],
-        texttemplate='%{text}',
-        colorbar=dict(title='Correlation')
-    ))
-    
-    correlation_fig.update_layout(
-        title='Correlation between Actual and Predicted Values',
-        template='plotly_white'
-    )
+    correlation_plot_data = {
+        "data": [
+            {
+                "z": correlation_data,
+                "x": ["TensorFlow", "PyTorch"],
+                "y": feature_names.tolist(),
+                "type": "heatmap",
+                "colorscale": "Viridis",
+                "text": [[f"{val:.3f}" for val in row] for row in correlation_data],
+                "texttemplate": "%{text}",
+                "colorbar": {"title": "Correlation"}
+            }
+        ],
+        "layout": {
+            "title": "Correlation between Actual and Predicted Values",
+            "template": "plotly_white"
+        }
+    }
     
     # Combined prediction plot for a key feature (e.g., 'Close')
     if 'Close' in feature_names:
@@ -275,95 +277,88 @@ def create_plotly_visualizations(df, actual, tf_pred, torch_pred, test_size, seq
     else:
         key_feature_idx = 0  # Default to first feature
     
-    combined_fig = go.Figure()
-    
     # Add a section of training data for context
     train_display_size = min(50, len(df) - test_size - seq_length)
     train_display_dates = df.index[-(test_size + train_display_size + 1):-(test_size + 1)]
     train_display_dates_str = [date.strftime('%Y-%m-%d') for date in train_display_dates]
     train_display_values = df.iloc[-(test_size + train_display_size + 1):-(test_size + 1), key_feature_idx].values
     
-    combined_fig.add_trace(go.Scatter(
-        x=train_display_dates_str,
-        y=train_display_values,
-        mode='lines',
-        name=f'Training Data ({feature_names[key_feature_idx]})',
-        line=dict(color='gray', width=1.5)
-    ))
-    
-    # Add actual test values
-    combined_fig.add_trace(go.Scatter(
-        x=test_dates_str,
-        y=actual[:, key_feature_idx],
-        mode='lines',
-        name=f'Actual Test Data ({feature_names[key_feature_idx]})',
-        line=dict(color='blue', width=2)
-    ))
-    
-    # Add TensorFlow predictions
-    combined_fig.add_trace(go.Scatter(
-        x=test_dates_str,
-        y=tf_pred[:, key_feature_idx],
-        mode='lines',
-        name='TensorFlow Prediction',
-        line=dict(color='red', width=2, dash='dash')
-    ))
-    
-    # Add PyTorch predictions
-    combined_fig.add_trace(go.Scatter(
-        x=test_dates_str,
-        y=torch_pred[:, key_feature_idx],
-        mode='lines',
-        name='PyTorch Prediction',
-        line=dict(color='green', width=2, dash='dot')
-    ))
-    
-    # Instead of using add_vline which causes issues, we'll add a vertical line as a shape
+    # Get the date string for train/test split for the vertical line
     train_test_split_x = df.index[-(test_size + 1)].strftime('%Y-%m-%d')
     
-    combined_fig.update_layout(
-        shapes=[
-            dict(
-                type="line",
-                xref="x",
-                yref="paper",
-                x0=train_test_split_x,
-                y0=0,
-                x1=train_test_split_x,
-                y1=1,
-                line=dict(
-                    color="black",
-                    width=2,
-                    dash="dash",
-                )
-            )
+    combined_plot_data = {
+        "data": [
+            {
+                "x": train_display_dates_str,
+                "y": train_display_values.tolist(),
+                "type": "scatter",
+                "mode": "lines",
+                "name": f"Training Data ({feature_names[key_feature_idx]})",
+                "line": {"color": "gray", "width": 1.5}
+            },
+            {
+                "x": test_dates_str,
+                "y": actual[:, key_feature_idx].tolist(),
+                "type": "scatter",
+                "mode": "lines",
+                "name": f"Actual Test Data ({feature_names[key_feature_idx]})",
+                "line": {"color": "blue", "width": 2}
+            },
+            {
+                "x": test_dates_str,
+                "y": tf_pred[:, key_feature_idx].tolist(),
+                "type": "scatter",
+                "mode": "lines",
+                "name": "TensorFlow Prediction",
+                "line": {"color": "red", "width": 2, "dash": "dash"}
+            },
+            {
+                "x": test_dates_str,
+                "y": torch_pred[:, key_feature_idx].tolist(),
+                "type": "scatter", 
+                "mode": "lines",
+                "name": "PyTorch Prediction",
+                "line": {"color": "green", "width": 2, "dash": "dot"}
+            }
         ],
-        annotations=[
-            dict(
-                x=train_test_split_x,
-                y=1.05,
-                xref="x",
-                yref="paper",
-                text="Train/Test Split",
-                showarrow=False,
-                font=dict(color="black")
-            )
-        ],
-        title=f'Stock Price Forecasting: {feature_names[key_feature_idx]} (Training + Testing)',
-        xaxis_title='Date',
-        yaxis_title='Value',
-        legend_title='Legend',
-        hovermode='x unified',
-        template='plotly_white'
-    )
+        "layout": {
+            "title": f"Stock Price Forecasting: {feature_names[key_feature_idx]} (Training + Testing)",
+            "xaxis": {"title": "Date"},
+            "yaxis": {"title": "Value"},
+            "legend": {"title": "Legend"},
+            "hovermode": "x unified",
+            "template": "plotly_white",
+            "shapes": [
+                {
+                    "type": "line",
+                    "xref": "x",
+                    "yref": "paper",
+                    "x0": train_test_split_x,
+                    "y0": 0,
+                    "x1": train_test_split_x,
+                    "y1": 1,
+                    "line": {
+                        "color": "black",
+                        "width": 2,
+                        "dash": "dash"
+                    }
+                }
+            ],
+            "annotations": [
+                {
+                    "x": train_test_split_x,
+                    "y": 1.05,
+                    "xref": "x",
+                    "yref": "paper",
+                    "text": "Train/Test Split",
+                    "showarrow": False,
+                    "font": {"color": "black"}
+                }
+            ]
+        }
+    }
     
-    # Convert figures to JSON for embedding in HTML
-    feature_figs_json = [fig.to_json() for fig in feature_figs]
-    metrics_fig_json = metrics_fig.to_json()
-    correlation_fig_json = correlation_fig.to_json()
-    combined_fig_json = combined_fig.to_json()
-    
-    return feature_figs_json, metrics_fig_json, correlation_fig_json, combined_fig_json
+    return feature_plots_data, metrics_plot_data, correlation_plot_data, combined_plot_data
 
 # Example usage
 if __name__ == "__main__":
@@ -394,7 +389,7 @@ if __name__ == "__main__":
     sample_df.reset_index().rename(columns={'index': 'Date'}).to_csv(csv_path, index=False)
     
     # Run forecasting
-    feature_figs_json, metrics_fig_json, correlation_fig_json, combined_fig_json = run_forecasting(csv_path, seq_length=10, test_size=30)
+    feature_plots_data, metrics_plot_data, correlation_plot_data, combined_plot_data = run_forecasting(csv_path, seq_length=10, test_size=30)
     
     # Create HTML with the interactive Plotly visualizations
     html_output = """
@@ -501,19 +496,18 @@ if __name__ == "__main__":
         </div>
         
         <script>
-            // Parse the JSON data from Python
-            const featureFigs = FEATURE_FIGS_PLACEHOLDER;
-            const metricsFig = METRICS_FIG_PLACEHOLDER;
-            const correlationFig = CORRELATION_FIG_PLACEHOLDER;
-            const combinedFig = COMBINED_FIG_PLACEHOLDER;
+            // Parse the JSON data
+            const featurePlots = FEATURE_PLOTS_PLACEHOLDER;
+            const metricsPlot = METRICS_PLOT_PLACEHOLDER;
+            const correlationPlot = CORRELATION_PLOT_PLACEHOLDER;
+            const combinedPlot = COMBINED_PLOT_PLACEHOLDER;
             
             // Create the tabs for feature selection
             const featureTabsContainer = document.getElementById('feature-tabs');
             let currentFeatureIndex = 0;
             
-            featureFigs.forEach((fig, index) => {
-                const parsedFig = JSON.parse(fig);
-                const featureName = parsedFig.layout.title.text.split(' - ')[0];
+            featurePlots.forEach((plot, index) => {
+                const featureName = plot.title.split(' - ')[0];
                 
                 const tab = document.createElement('button');
                 tab.className = 'feature-tab ' + (index === 0 ? 'active' : '');
@@ -522,23 +516,17 @@ if __name__ == "__main__":
                     document.querySelectorAll('.feature-tab').forEach(t => t.classList.remove('active'));
                     this.classList.add('active');
                     currentFeatureIndex = index;
-                    Plotly.react('feature-plot', JSON.parse(featureFigs[index]));
+                    Plotly.react('feature-plot', featurePlots[index].data, featurePlots[index].layout);
                 };
                 
                 featureTabsContainer.appendChild(tab);
             });
             
-            // Plot the initial feature plot
-            Plotly.newPlot('feature-plot', JSON.parse(featureFigs[0]));
-            
-            // Plot the metrics comparison
-            Plotly.newPlot('metrics-plot', JSON.parse(metricsFig));
-            
-            // Plot the correlation heatmap
-            Plotly.newPlot('correlation-plot', JSON.parse(correlationFig));
-            
-            // Plot the combined overview
-            Plotly.newPlot('combined-plot', JSON.parse(combinedFig));
+            // Initial plots
+            Plotly.newPlot('feature-plot', featurePlots[0].data, featurePlots[0].layout);
+            Plotly.newPlot('metrics-plot', metricsPlot.data, metricsPlot.layout);
+            Plotly.newPlot('correlation-plot', correlationPlot.data, correlationPlot.layout);
+            Plotly.newPlot('combined-plot', combinedPlot.data, combinedPlot.layout);
             
             // Make plots responsive
             window.onresize = function() {
@@ -560,11 +548,11 @@ if __name__ == "__main__":
     </html>
     """
     
-    # Replace the placeholders
-    html_output = html_output.replace('FEATURE_FIGS_PLACEHOLDER', json.dumps(feature_figs_json))
-    html_output = html_output.replace('METRICS_FIG_PLACEHOLDER', metrics_fig_json)
-    html_output = html_output.replace('CORRELATION_FIG_PLACEHOLDER', correlation_fig_json)
-    html_output = html_output.replace('COMBINED_FIG_PLACEHOLDER', combined_fig_json)
+    # Replace the placeholders with JSON strings
+    html_output = html_output.replace('FEATURE_PLOTS_PLACEHOLDER', json.dumps(feature_plots_data))
+    html_output = html_output.replace('METRICS_PLOT_PLACEHOLDER', json.dumps(metrics_plot_data))
+    html_output = html_output.replace('CORRELATION_PLOT_PLACEHOLDER', json.dumps(correlation_plot_data))
+    html_output = html_output.replace('COMBINED_PLOT_PLACEHOLDER', json.dumps(combined_plot_data))
     
     # Save the HTML to a file
     with open('stock_forecasting_dashboard.html', 'w') as f:
