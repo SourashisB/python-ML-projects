@@ -1,137 +1,69 @@
-# Import necessary libraries
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import IsolationForest
-from sklearn.cluster import DBSCAN, KMeans
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_score
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Load dataset
-data = pd.read_csv('bank_transactions_data_2.csv')
+# Load data
+df = pd.read_csv('bank_transactions_data_2.csv')
 
-# Step 1: Initial Exploration
-print("Dataset Overview:")
-print(data.info())
-print("\nDataset Statistics:")
-print(data.describe())
+# Datetime conversion
+df['TransactionDate'] = pd.to_datetime(df['TransactionDate'])
+df['PreviousTransactionDate'] = pd.to_datetime(df['PreviousTransactionDate'])
 
-# Step 2: Data Preprocessing
-# Fill missing values
-data.fillna(method='ffill', inplace=True)
+# Feature engineering
+df['TimeSinceLastTransaction'] = (df['TransactionDate'] - df['PreviousTransactionDate']).dt.total_seconds()
 
-# Encode categorical columns
-categorical_columns = ['TransactionType', 'Location', 'DeviceID', 'IP Address', 'MerchantID', 'Channel', 'CustomerOccupation']
-label_encoders = {}
-for column in categorical_columns:
+# Drop non-feature columns
+df_features = df.drop(['TransactionID', 'AccountID', 'TransactionDate', 'PreviousTransactionDate'], axis=1)
+
+# Label encoding
+categorical_cols = ['TransactionType', 'Location', 'DeviceID', 'IP Address', 'MerchantID', 'Channel', 'CustomerOccupation']
+le_dict = {}
+for col in categorical_cols:
     le = LabelEncoder()
-    data[column] = le.fit_transform(data[column])
-    label_encoders[column] = le
+    df_features[col] = le.fit_transform(df_features[col].astype(str))
+    le_dict[col] = le
 
-# Feature scaling for numerical columns
+# Fill missing values
+df_features.fillna(df_features.median(numeric_only=True), inplace=True)
+
+# Scaling
 scaler = StandardScaler()
-numerical_columns = [
-    'TransactionAmount', 'CustomerAge', 'TransactionDuration', 
-    'LoginAttempts', 'AccountBalance'
-]
-data[numerical_columns] = scaler.fit_transform(data[numerical_columns])
+X_scaled = scaler.fit_transform(df_features)
 
-# Step 3: Feature Engineering
-# Create new features
-data['TimeSinceLastTransaction'] = (
-    pd.to_datetime(data['TransactionDate']) - pd.to_datetime(data['PreviousTransactionDate'])
-).dt.total_seconds()
-data['TimeSinceLastTransaction'].fillna(0, inplace=True)
-data['TimeSinceLastTransaction'] = scaler.fit_transform(data[['TimeSinceLastTransaction']])
+# Train-test split
+X_train, X_test = train_test_split(X_scaled, test_size=0.2, random_state=42)
 
-# Transaction frequency and average transaction amount
-data['TransactionFrequency'] = data.groupby('AccountID')['TransactionAmount'].transform('count')
-data['AvgTransactionAmount'] = data.groupby('AccountID')['TransactionAmount'].transform('mean')
-data['TransactionFrequency'] = scaler.fit_transform(data[['TransactionFrequency']])
-data['AvgTransactionAmount'] = scaler.fit_transform(data[['AvgTransactionAmount']])
+# Isolation Forest
+iso_forest = IsolationForest(n_estimators=100, contamination=0.05, random_state=42)
+iso_forest.fit(X_train)
 
-# Drop unnecessary columns
-data.drop(columns=['TransactionID', 'AccountID', 'TransactionDate', 'PreviousTransactionDate'], inplace=True)
+# Predictions
+train_preds = iso_forest.predict(X_train)
+test_preds = iso_forest.predict(X_test)
+test_scores = iso_forest.decision_function(X_test)
 
-# Step 4: Visual Exploration
-# Pairplot to visualize relationships
-sns.pairplot(data.sample(500), diag_kind='kde', corner=True)
+# Visualization 1: Anomaly score distribution
+plt.figure(figsize=(10,6))
+sns.histplot(test_scores, bins=50, kde=True)
+plt.title('Distribution of Anomaly Scores on Test Data')
+plt.xlabel('Anomaly Score')
+plt.ylabel('Frequency')
 plt.show()
 
-# Correlation heatmap
-plt.figure(figsize=(12, 8))
-sns.heatmap(data.corr(), annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5)
-plt.title("Feature Correlation Heatmap")
-plt.show()
+# Visualization 2: Number of anomalies
+anomalies = np.sum(test_preds == -1)
+total = len(test_preds)
+print(f"Anomalies detected in test set: {anomalies} out of {total} ({anomalies/total*100:.2f}%)")
 
-# Step 5: Anomaly Detection with Isolation Forest
-print("\nRefining Anomaly Detection with Isolation Forest...")
-
-# Tune Isolation Forest parameters
-iso_forest = IsolationForest(n_estimators=200, contamination=0.05, max_samples='auto', random_state=42)
-data['AnomalyScore'] = iso_forest.fit_predict(data)
-
-# Add a binary anomaly flag
-data['Anomaly'] = data['AnomalyScore'].apply(lambda x: 1 if x == -1 else 0)
-
-# Display updated anomaly statistics
-print(f"Number of anomalies detected: {data['Anomaly'].sum()}")
-print(f"Percentage of anomalies: {data['Anomaly'].mean() * 100:.2f}%")
-
-# Step 6: Clustering (DBSCAN and KMeans)
-# Dimensionality reduction with PCA
-pca = PCA(n_components=2)
-data_pca = pca.fit_transform(data.drop(columns=['AnomalyScore', 'Anomaly']))
-
-# DBSCAN clustering
-print("\nExploring Clustering with DBSCAN...")
-dbscan = DBSCAN(eps=0.5, min_samples=10, metric='euclidean')
-data['DBSCAN_Cluster'] = dbscan.fit_predict(data_pca)
-
-# KMeans clustering
-print("\nExploring Clustering with KMeans...")
-kmeans = KMeans(n_clusters=5, random_state=42)
-data['KMeans_Cluster'] = kmeans.fit_predict(data_pca)
-
-# Plot clusters
-plt.figure(figsize=(10, 6))
-sns.scatterplot(x=data_pca[:, 0], y=data_pca[:, 1], hue=data['KMeans_Cluster'], palette='viridis', alpha=0.6)
-plt.title("KMeans Clustering")
-plt.xlabel("PCA Component 1")
-plt.ylabel("PCA Component 2")
-plt.legend(title="Cluster", loc="upper right")
-plt.show()
-
-plt.figure(figsize=(10, 6))
-sns.scatterplot(x=data_pca[:, 0], y=data_pca[:, 1], hue=data['DBSCAN_Cluster'], palette='viridis', alpha=0.6)
-plt.title("DBSCAN Clustering")
-plt.xlabel("PCA Component 1")
-plt.ylabel("PCA Component 2")
-plt.legend(title="Cluster", loc="upper right")
-plt.show()
-
-# Evaluate clustering
-dbscan_clusters = len(set(data['DBSCAN_Cluster'])) - (1 if -1 in data['DBSCAN_Cluster'] else 0)
-print(f"DBSCAN found {dbscan_clusters} clusters (excluding noise).")
-
-kmeans_silhouette = silhouette_score(data_pca, data['KMeans_Cluster'])
-print(f"KMeans Silhouette Score: {kmeans_silhouette:.2f}")
-
-# Step 7: Save Results
-output_file = "refined_data_with_anomalies.csv"
-data.to_csv(output_file, index=False)
-print(f"\nRefined data with anomalies and clustering results saved to: {output_file}")
-
-# Step 8: Enhanced Visualization (Optional)
-# Visualize anomalies on a pairplot with clusters
-sns.pairplot(
-    data.sample(500),
-    diag_kind='kde',
-    corner=True,
-    hue='Anomaly',
-    palette={0: 'blue', 1: 'red'}
-)
-plt.title("Anomaly Detection Pairplot")
+# Visualization 3: t-SNE (optional)
+from sklearn.manifold import TSNE
+X_test_2d = TSNE(n_components=2, random_state=42).fit_transform(X_test)
+plt.figure(figsize=(10,6))
+sns.scatterplot(x=X_test_2d[:,0], y=X_test_2d[:,1], hue=(test_preds==-1), palette={True:'red', False:'blue'}, alpha=0.5)
+plt.title('t-SNE Projection of Test Data\nRed=Detected Anomalies, Blue=Normal')
+plt.legend(['Anomaly','Normal'])
 plt.show()
