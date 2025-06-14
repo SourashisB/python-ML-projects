@@ -1,66 +1,68 @@
-# Import required libraries
-import numpy as np
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
-import xgboost as xgb
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-import math
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
 
-# Load the dataset
-file_path = "Ali_Baba_Stock_Data.csv"  # Change this to your actual file path
-df = pd.read_csv(file_path, parse_dates=['Date'], index_col='Date')
-# Feature Engineering: Adding Moving Averages & Indicators
-df['SMA_10'] = df['Adj Close'].rolling(window=10).mean()
-df['SMA_50'] = df['Adj Close'].rolling(window=50).mean()
-df['EMA_10'] = df['Adj Close'].ewm(span=10).mean()
-df['Price Change'] = df['Adj Close'].pct_change()  # Percentage Change
-df.dropna(inplace=True)  # Drop NaN values
+# 1. Load Data
+csv_path = 'NVIDIA_STOCK.csv'  # Change to your path
+df = pd.read_csv(csv_path, parse_dates=['Date'])
+df = df.sort_values('Date').reset_index(drop=True)
 
-# Create Lag Features (Past Prices as Input for Prediction)
-for lag in range(1, 11):  # Using past 10 days as features
-    df[f'Lag_{lag}'] = df['Adj Close'].shift(lag)
+# 2. Feature Engineering: Add lag features
+N_LAGS = 5
+for lag in range(1, N_LAGS + 1):
+    df[f'Adj_Close_Lag_{lag}'] = df['Adj Close'].shift(lag)
 
-df.dropna(inplace=True)  # Drop NaN from lag features
+feature_cols = ['Open', 'High', 'Low', 'Close', 'Volume'] + [f'Adj_Close_Lag_{lag}' for lag in range(1, N_LAGS + 1)]
+df['Adj_Close_Next'] = df['Adj Close'].shift(-1)
 
-# Selecting Features
-features = ['Open', 'High', 'Low', 'Volume', 'SMA_10', 'SMA_50', 'EMA_10', 'Price Change'] + [f'Lag_{i}' for i in range(1, 11)]
-target = 'Adj Close'
+# Drop rows with any NaN (due to shifting)
+df = df.dropna().reset_index(drop=True)
 
-# Splitting into Train-Test (90% Train, 10% Test)
-train_size = int(len(df) * 0.90)
-train_df, test_df = df.iloc[:train_size], df.iloc[train_size:]
+# Features and target
+X = df[feature_cols].values
+y = df['Adj_Close_Next'].values
 
-X_train, y_train = train_df[features], train_df[target]
-X_test, y_test = test_df[features], test_df[target]
+# 3. Train-test split (time series, no shuffling)
+split_index = int(len(df) * 0.8)
+X_train, X_test = X[:split_index], X[split_index:]
+y_train, y_test = y[:split_index], y[split_index:]
+dates_test = df['Date'][split_index:]
 
-# Create XGBoost Model
-xgb_model = xgb.XGBRegressor(
-    objective='reg:squarederror', 
-    n_estimators=500, 
-    learning_rate=0.01, 
-    max_depth=6, 
-    subsample=0.8, 
-    colsample_bytree=0.8, 
-    random_state=42
-)
+# 4. Model Training
+model = RandomForestRegressor(n_estimators=200, random_state=42)
+model.fit(X_train, y_train)
 
-# Train the Model
-xgb_model.fit(X_train, y_train)
+# 5. Prediction
+y_pred = model.predict(X_test)
 
-# Predictions
-predictions = xgb_model.predict(X_test)
+# 6. Evaluation
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+print(f"Mean Squared Error: {mse:.2f}")
+print(f"R^2 Score: {r2:.2f}")
 
-# Calculate RMSE & MAE
-rmse = math.sqrt(mean_squared_error(y_test, predictions))
-mae = mean_absolute_error(y_test, predictions)
-print(f'XGBoost RMSE: {rmse}, XGBoost MAE: {mae}')
-
-# Plot Actual vs Predicted Prices
-plt.figure(figsize=(12,6))
-plt.plot(test_df.index, y_test, label="Actual Price", color='blue')
-plt.plot(test_df.index, predictions, label="Predicted Price", color='red')
-plt.title('Alibaba Stock Price Prediction (XGBoost)')
+# 7. Visualization
+plt.figure(figsize=(14, 6))
+plt.plot(dates_test, y_test, label='Actual', marker='o')
+plt.plot(dates_test, y_pred, label='Predicted', marker='x')
+plt.title('Next Day Adj Close: Actual vs Predicted')
 plt.xlabel('Date')
-plt.ylabel('Stock Price')
+plt.ylabel('Adj Close')
 plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# 8. Residual Plot
+plt.figure(figsize=(14, 4))
+plt.plot(dates_test, y_test - y_pred, label='Residual (Actual - Predicted)')
+plt.hlines(0, dates_test.iloc[0], dates_test.iloc[-1], colors='red', linestyles='dashed')
+plt.title('Prediction Residuals')
+plt.xlabel('Date')
+plt.ylabel('Residual')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
 plt.show()
