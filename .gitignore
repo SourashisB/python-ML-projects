@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.pth
+.save
 
 # C extensions
 *.so
@@ -169,3 +171,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+
+.pth
+.save
