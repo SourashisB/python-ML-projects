@@ -1,0 +1,29 @@
+========================================
+📊 **Model Development and Evaluation Process Summary:**
+========================================
+
+- Loaded the heart disease dataset and explored the distribution of key features.
+- Applied one-hot encoding to categorical variables.
+- Split the data into 80% training and 20% testing sets, visualized the split.
+- Applied standard scaling (z-score normalization) to continuous features for KNN and Logistic Regression.
+- Trained and evaluated four classification models:
+    - K-Nearest Neighbors (KNN) [non-tree]
+    - XGBoost Classifier [tree]
+    - Random Forest Classifier [tree]
+    - Logistic Regression [non-tree]
+- Compared model accuracies via a bar plot.
+- Visualized confusion matrices for all classifiers to assess prediction quality.
+- XGBoost and Random Forest are tree-based models; KNN and Logistic Regression are non-tree-based.
+- The process and results are visualized in the generated PNG files for inclusion in your report.
+
+========================================
+FILES SAVED FOR REPORT:
+- feature_distributions.png (Feature histograms)
+- train_test_split.png (Train/test sizes)
+- feature_scaling.png (Effect of scaling on 'Age')
+- model_accuracy_comparison.png (Model accuracy barplot)
+- all_confusion_matrices.png (All confusion matrices)
+KNN: 0.8804
+XGBoost: 0.8587
+Random Forest: 0.8750
+Logistic Regression: 0.8859
