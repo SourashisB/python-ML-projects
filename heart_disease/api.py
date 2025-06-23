@@ -1,38 +1,44 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from typing import Optional
 import joblib
 import numpy as np
 import pandas as pd
 
 app = FastAPI()
 
-# Load model, scaler, and feature list
+# Load model, scaler, feature list, and default values
 model = joblib.load('logreg_model.joblib')
 scaler = joblib.load('scaler.joblib')
 model_features = joblib.load('model_features.joblib')
+defaults = joblib.load('defaults.joblib')  # new: see notes below
 
-# Define the expected input (edit typing as needed)
+# Define the expected input with defaults as None (optional)
 class PatientData(BaseModel):
-    Age: int
-    Sex: str
-    ChestPainType: str
-    RestingBP: int
-    Cholesterol: int
-    FastingBS: int
-    RestingECG: str
-    MaxHR: int
-    ExerciseAngina: str
-    Oldpeak: float
-    ST_Slope: str
+    Age: Optional[int] = None
+    Sex: Optional[str] = None
+    ChestPainType: Optional[str] = None
+    RestingBP: Optional[int] = None
+    Cholesterol: Optional[int] = None
+    FastingBS: Optional[int] = None
+    RestingECG: Optional[str] = None
+    MaxHR: Optional[int] = None
+    ExerciseAngina: Optional[str] = None
+    Oldpeak: Optional[float] = None
+    ST_Slope: Optional[str] = None
 
 @app.get("/")
 def root():
-    return {"message": "Heart Disease Logistic Regression API"}
+    return {"message": "Heart Disease Logistic Regression API (handles missing values)"}
 
 @app.post("/predict")
 def predict(data: PatientData):
     # Convert input to dataframe
     input_dict = data.dict()
+    # Fill missing entries with defaults
+    for k, v in defaults.items():
+        if input_dict.get(k) is None:
+            input_dict[k] = v
     input_df = pd.DataFrame([input_dict])
 
     # One-hot encode, align columns
@@ -55,5 +61,3 @@ def predict(data: PatientData):
         "prediction": int(pred),
         "probability_heart_disease": float(proba)
     }
-
-# To run locally: uvicorn api:app --reload

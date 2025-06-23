@@ -160,3 +160,19 @@ for model, acc in results.items():
 
 best_model = max(results, key=results.get)
 print(f"\nBest model: {best_model} (Accuracy: {results[best_model]:.4f})")
+
+# Assume df is your DataFrame
+# Encode categorical variables for correlation
+df_encoded = pd.get_dummies(df, drop_first=True)
+
+# Compute correlation matrix
+corr = df_encoded.corr()
+
+# Plot heatmap of correlation matrix for all features vs HeartDisease
+plt.figure(figsize=(12, 8))
+sns.heatmap(corr[['HeartDisease']].sort_values(by='HeartDisease', ascending=False), 
+            annot=True, cmap='coolwarm', vmin=-1, vmax=1)
+plt.title('Correlation of All Features with HeartDisease')
+plt.tight_layout()
+plt.savefig('all_features_vs_target_correlation_heatmap.png')
+plt.show()
